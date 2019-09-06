@@ -2,6 +2,6 @@
 
 Embeddable Lua Profiler is a pure Lua library designed to profile Lua code.
 
-NOTE: The `debug` library already has limitations; but when using an advanced environment like LuaJIT, the results can be even more difficult to interpret. This library only aims to be a basic Lua code profiler by focusing on reliable data given by the VM instead of finding tricks to measure everything (like C calls).
+NOTE: The `debug` library already has limitations; but when using a more sophisticated environment like LuaJIT, the results can be even more difficult to interpret. This library only aims to be a basic Lua code profiler by focusing on reliable data given by the VM instead of finding tricks to measure everything (like C calls).
 
 TIP: LuaJIT 2.1.x has a built-in profiler more suited than this library.
