@@ -119,7 +119,17 @@ function ELProfiler.start()
 end
 
 -- stop profiling
--- return profile data
+-- return profile data {}
+--- blocks: map of block id => block
+---- block: {}
+----- id: block id
+----- calls: number of call
+----- time: time spent
+----- sub_time: time spent by sub blocks
+----- sub_blocks: map of block => data
+------ data: {}
+------- calls: number of call of this sub block inside this block
+------- time: time spent in this sub block inside this block
 function ELProfiler.stop()
   if running then
     running = false
@@ -133,6 +143,7 @@ function ELProfiler.stop()
 end
 
 -- set clock function
+-- the default function is os.time
 -- f_clock(): should return the current execution time reference (a number)
 function ELProfiler.setClock(f_clock)
   clock = f_clock
