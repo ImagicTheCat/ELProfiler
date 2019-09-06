@@ -72,7 +72,7 @@ local function hook(t)
         local delta = clock()-block.first_call_time
         block.time = block.time+delta
 
-        local super_block = (stack[2] and blocks[stack[2]])
+        local super_block = (stack[2] and blocks[stack[2]] or blocks.record)
         if super_block then
           super_block.sub_time = super_block.sub_time+delta
 
@@ -105,6 +105,16 @@ function ELProfiler.start()
   end
 
   running = true
+  blocks.record = { -- record block (origin)
+    id = "record",
+    calls = 1,
+    time = 0,
+    sub_time = 0,
+    first_call_time = clock(),
+    sub_blocks = {},
+    depth = 0
+  }
+
   debug.sethook(hook, "cr")
 end
 
@@ -114,6 +124,7 @@ function ELProfiler.stop()
   if running then
     running = false
     debug.sethook()
+    blocks.record.time = clock()-blocks.record.first_call_time
 
     local rdata = {blocks = blocks}
     blocks = {}
