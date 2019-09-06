@@ -1,4 +1,4 @@
--- ELProfiler ()
+-- ELProfiler (https://github.com/ImagicTheCat/ELProfiler)
 -- license: MIT
 -- author: ImagicTheCat
  
