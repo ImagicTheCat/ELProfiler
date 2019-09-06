@@ -38,7 +38,7 @@ end
 local function hook(t)
   if t == "call" then
     local stack = {}
-    parse_stack(stack, 2, 2)
+    parse_stack(stack, 2, 3)
 
     -- get/create block
     local block = blocks[stack[1]]
@@ -61,6 +61,23 @@ local function hook(t)
     if block.depth == 1 then
       block.first_call_time = clock()
     end
+
+    local super_block = (stack[2] and blocks[stack[2]] or blocks.record)
+    if super_block then
+      -- get/create sub block
+      local sub_blocks = super_block.sub_blocks
+      local sub_block = sub_blocks[block]
+      if not sub_block then
+        sub_block = {
+          time = 0,
+          calls = 0
+        }
+
+        sub_blocks[block] = sub_block
+      end
+
+      sub_block.calls = sub_block.calls+1
+    end
   elseif t == "return" then
     local stack = {}
     parse_stack(stack, 2, 3)
@@ -77,19 +94,8 @@ local function hook(t)
           super_block.sub_time = super_block.sub_time+delta
 
           -- get/create sub block
-          local sub_blocks = super_block.sub_blocks
-          local sub_block = sub_blocks[block]
-          if not sub_block then
-            sub_block = {
-              time = 0,
-              calls = 0
-            }
-
-            sub_blocks[block] = sub_block
-          end
-
+          local sub_block = super_block.sub_blocks[block]
           sub_block.time = sub_block.time+delta
-          sub_block.calls = sub_block.calls+1
         end
       end
     end
