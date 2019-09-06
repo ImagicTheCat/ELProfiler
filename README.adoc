@@ -30,6 +30,11 @@ TIP: Blocks may include other blocks, `block.time-block.sub_time` will give insi
 
 [source, lua]
 ----
+-- set clock function
+-- the default function is os.clock
+-- f_clock(): should return the current execution time reference (a number)
+ELProfiler.setClock(f_clock)
+
 -- start profiling
 ELProfiler.start()
 
@@ -46,9 +51,4 @@ ELProfiler.start()
 ------- calls: number of call of this sub block inside this block
 ------- time: time spent in this sub block inside this block
 ELProfiler.stop()
-
--- set clock function
--- the default function is os.time
--- f_clock(): should return the current execution time reference (a number)
-ELProfiler.setClock(f_clock)
 ----

@@ -149,7 +149,7 @@ function ELProfiler.stop()
 end
 
 -- set clock function
--- the default function is os.time
+-- the default function is os.clock
 -- f_clock(): should return the current execution time reference (a number)
 function ELProfiler.setClock(f_clock)
   clock = f_clock
