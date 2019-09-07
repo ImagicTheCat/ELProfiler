@@ -26,6 +26,8 @@ record:: the record block is defined by the space between `start()` and `stop()`
 
 TIP: Blocks may include other blocks, `block.time-block.sub_time` will give insight on the time spent in the block itself, excluding recorded sub blocks.
 
+WARNING: A measure of 0 is a hint that the measure is probably wrong.
+
 == API
 
 [source, lua]
