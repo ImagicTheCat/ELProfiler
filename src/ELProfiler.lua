@@ -8,11 +8,14 @@ local running = false
 
 -- map of block id string => {}
 local blocks = {} 
+local s_stack = {} -- section stack
 
 local debug_getinfo = debug.getinfo
 local table_insert = table.insert
 local table_concat = table.concat
+local table_remove = table.remove
 local clock = os.clock
+local mode
 
 -- append blocks id to list, stack ascending order
 -- max: maximum stack index, nil to disable
@@ -34,82 +37,92 @@ local function parse_stack(list, start_level, max)
   end
 end
 
+local function block_begin(id, super_block)
+  -- get/create block
+  local block = blocks[id]
+  if not block then
+    block = {
+      id = id,
+      calls = 0,
+      time = 0,
+      sub_time = 0,
+      first_call_time = 0,
+      sub_blocks = {},
+      depth = 0
+    }
+
+    blocks[id] = block
+  end
+
+  block.calls = block.calls+1
+  block.depth = block.depth+1
+  if block.depth == 1 then
+    block.first_call_time = clock()
+  end
+
+  if super_block then
+    -- get/create sub block
+    local sub_blocks = super_block.sub_blocks
+    local sub_block = sub_blocks[block]
+    if not sub_block then
+      sub_block = {
+        time = 0,
+        calls = 0
+      }
+
+      sub_blocks[block] = sub_block
+    end
+
+    sub_block.calls = sub_block.calls+1
+  end
+end
+
+local function block_end(id, super_block)
+  local block = blocks[id]
+  if block then
+    block.depth = block.depth-1
+    if block.depth == 0 then
+      local delta = clock()-block.first_call_time
+      block.time = block.time+delta
+
+      if super_block then
+        super_block.sub_time = super_block.sub_time+delta
+
+        -- get/create sub block
+        local sub_block = super_block.sub_blocks[block]
+        sub_block.time = sub_block.time+delta
+      end
+    end
+  end
+end
+
 -- debug hook
 local function hook(t)
   if t == "call" then
     local stack = {}
     parse_stack(stack, 2, 3)
-
-    -- get/create block
-    local block = blocks[stack[1]]
-    if not block then
-      block = {
-        id = stack[1],
-        calls = 0,
-        time = 0,
-        sub_time = 0,
-        first_call_time = 0,
-        sub_blocks = {},
-        depth = 0
-      }
-
-      blocks[stack[1]] = block
-    end
-
-    block.calls = block.calls+1
-    block.depth = block.depth+1
-    if block.depth == 1 then
-      block.first_call_time = clock()
-    end
-
-    local super_block = (stack[2] and blocks[stack[2]] or blocks.record)
-    if super_block then
-      -- get/create sub block
-      local sub_blocks = super_block.sub_blocks
-      local sub_block = sub_blocks[block]
-      if not sub_block then
-        sub_block = {
-          time = 0,
-          calls = 0
-        }
-
-        sub_blocks[block] = sub_block
-      end
-
-      sub_block.calls = sub_block.calls+1
-    end
+    block_begin(stack[1], stack[2] and blocks[stack[2]] or blocks.record)
   elseif t == "return" then
     local stack = {}
     parse_stack(stack, 2, 3)
-
-    local block = blocks[stack[1]]
-    if block then
-      block.depth = block.depth-1
-      if block.depth == 0 then
-        local delta = clock()-block.first_call_time
-        block.time = block.time+delta
-
-        local super_block = (stack[2] and blocks[stack[2]] or blocks.record)
-        if super_block then
-          super_block.sub_time = super_block.sub_time+delta
-
-          -- get/create sub block
-          local sub_block = super_block.sub_blocks[block]
-          sub_block.time = sub_block.time+delta
-        end
-      end
-    end
+    block_end(stack[1], stack[2] and blocks[stack[2]] or blocks.record)
   end
 end
 
 -- API
 
 -- start profiling
-function ELProfiler.start()
+-- mode: string
+--- "hook": debug hook events (default)
+--- "manual": no events, manual sections sb/se
+function ELProfiler.start(mode)
+  if not mode then mode = "hook" end
+
   if running then
     ELProfiler.stop()
   end
 
+  mode = mode
   running = true
   blocks.record = { -- record block (origin)
     id = "record",
@@ -121,7 +134,9 @@ function ELProfiler.start()
     depth = 0
   }
 
-  debug.sethook(hook, "cr")
+  if mode == "hook" then
+    debug.sethook(hook, "cr")
+  end
 end
 
 -- stop profiling
@@ -139,11 +154,15 @@ end
 function ELProfiler.stop()
   if running then
     running = false
-    debug.sethook()
+    if mode == "hook" then
+      debug.sethook()
+    end
     blocks.record.time = clock()-blocks.record.first_call_time
 
     local rdata = {blocks = blocks}
     blocks = {}
+    s_stack = {}
+    mode = nil
     return rdata
   end
 end
@@ -153,6 +172,21 @@ end
 -- f_clock(): should return the current execution time reference (a number)
 function ELProfiler.setClock(f_clock)
   clock = f_clock
+end
+
+-- section begin
+-- id: custom block id
+function ELProfiler.sb(id)
+  local s_id = s_stack[#s_stack]
+  block_begin(id, s_id and blocks[s_id] or blocks.record)
+  table_insert(s_stack, id)
+end
+
+-- section end
+function ELProfiler.se()
+  local id = table_remove(s_stack)
+  local s_id = s_stack[#s_stack]
+  block_end(id, s_id and blocks[s_id] or blocks.record)
 end
 
 return ELProfiler

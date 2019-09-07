@@ -23,8 +23,20 @@ The profiler will listen to `call` and `return` hook events of the `debug` libra
 [horizontal]
 function:: each captured function call create a block of id `what:namewhat:name:short_src:linedefined` as described at https://www.lua.org/pil/23.1.html
 record:: the record block is defined by the space between `start()` and `stop()`
+section:: defined by calls to `sb()` and `se()`
 
 TIP: Blocks may include other blocks, `block.time-block.sub_time` will give insight on the time spent in the block itself, excluding recorded sub blocks.
+
+.Modes
+[horizontal]
+hook:: use debug hook events
+manual:: no events, manual measures (sections)
+
+NOTE: Manual measures are probably not what you expect from a profiler, but they can be useful to manually investigate performance when other methods don't give useful results. For example, they may get compiled by LuaJIT and may not prevent the JIT compilation of the profiled code.
+
+TIP: `os.clock()` is NYI in LuaJIT 2.0.x, you may need to use a more precise and compilable clock function to that purpose.
+
+NOTE: Using sections in `hook` mode is possible, but the section stack doesn't mix with the Lua call stack.
 
 WARNING: A measure of 0 is a hint that the measure is probably wrong.
 
@@ -38,7 +50,10 @@ WARNING: A measure of 0 is a hint that the measure is probably wrong.
 ELProfiler.setClock(f_clock)
 
 -- start profiling
-ELProfiler.start()
+-- mode: string
+--- "hook": debug hook events (default)
+--- "manual": no events, manual sections sb/se
+ELProfiler.start(mode)
 
 -- stop profiling
 -- return profile data {}
@@ -53,4 +68,11 @@ ELProfiler.start()
 ------- calls: number of call of this sub block inside this block
 ------- time: time spent in this sub block inside this block
 ELProfiler.stop()
+
+-- section begin
+-- id: custom block id
+ELProfiler.sb(id)
+
+-- section end
+ELProfiler.se()
 ----
