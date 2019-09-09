@@ -112,7 +112,7 @@ end
 -- API
 
 -- start profiling
--- mode: string
+-- mode: (optional) string
 --- "hook": debug hook events (default)
 --- "manual": no events, manual sections sb/se
 function ELProfiler.start(mode)
@@ -187,6 +187,92 @@ function ELProfiler.se()
   local id = table_remove(s_stack)
   local s_id = s_stack[#s_stack]
   block_end(id, s_id and blocks[s_id] or blocks.record)
+end
+
+-- complete string with spaces to reach n
+-- left: if true, left padding
+local function pad_string(str, n, left)
+  if left then
+    return string.rep(" ", n-string.len(str))..str
+  else
+    return str..string.rep(" ", n-string.len(str))
+  end
+end
+
+-- return percent notation from factor
+local function factor_to_percent(v)
+  return pad_string((math.floor(v*10000)/100).."%", 6, true)
+end
+
+-- create text report from profile data
+-- mode: (optional) string
+--- "spent_tree": blocks by descending time spent with sub blocks (+calls) (default)
+--- "real_list": blocks by descending "real" time spent (+calls)
+-- threshold: (optional) minimum time factor (0.01 => 1%) required for a block to be displayed (default -1)
+-- return formatted string
+function ELProfiler.format(profile_data, mode, threshold)
+  if not mode then mode = "spent_tree" end
+  if not threshold then threshold = -1 end
+
+  local strs = {}
+
+  if mode == "spent_tree" then
+    local blocks = profile_data.blocks
+    local list = {}
+
+    local max_len = 0
+    for id, block in pairs(blocks) do
+      table.insert(list, block)
+      if string.len(block.id) > max_len then max_len = string.len(block.id) end
+    end
+
+    table.sort(list, function(a, b)
+      return a.time > b.time
+    end)
+
+    for _, block in ipairs(list) do
+      local factor = block.time/blocks.record.time
+      if factor < threshold then break end
+
+      table.insert(strs, pad_string(block.id, max_len+3).."  "..factor_to_percent(factor).."  "..block.calls.."\n")
+
+      local sub_list = {}
+      for sub_block in pairs(block.sub_blocks) do
+        table.insert(sub_list, sub_block)
+      end
+
+      table.sort(sub_list, function(a, b)
+        return a.time > b.time
+      end)
+
+      for _, sub_block in ipairs(sub_list) do
+        local data = block.sub_blocks[sub_block]
+        table.insert(strs, "   "..pad_string(sub_block.id, max_len).."  "..factor_to_percent(sub_block.time/block.time).."  "..sub_block.calls.."\n")
+      end
+    end
+  elseif mode == "real_list" then
+    local blocks = profile_data.blocks
+    local list = {}
+
+    local max_len = 0
+    for id, block in pairs(blocks) do
+      table.insert(list, block)
+      if string.len(block.id) > max_len then max_len = string.len(block.id) end
+    end
+
+    table.sort(list, function(a, b)
+      return a.time-a.sub_time > b.time-b.sub_time
+    end)
+
+    for _, block in ipairs(list) do
+      local factor = (block.time-block.sub_time)/blocks.record.time
+      if factor < threshold then break end
+
+      table.insert(strs, pad_string(block.id, max_len).."  "..factor_to_percent(factor).."  "..block.calls.."\n")
+    end
+  end
+
+  return table.concat(strs)
 end
 
 return ELProfiler

@@ -75,4 +75,12 @@ ELProfiler.sb(id)
 
 -- section end
 ELProfiler.se()
+
+-- create text report from profile data
+-- mode: (optional) string
+--- "spent_tree": blocks by descending time spent with sub blocks (+calls) (default)
+--- "real_list": blocks by descending "real" time spent (+calls)
+-- threshold: (optional) minimum time factor (0.01 => 1%) required for a block to be displayed (default -1)
+-- return formatted string
+ELProfiler.format(profile_data, mode, threshold)
 ----
