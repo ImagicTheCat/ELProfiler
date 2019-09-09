@@ -201,7 +201,7 @@ end
 
 -- return percent notation from factor
 local function factor_to_percent(v)
-  return pad_string((math.floor(v*10000)/100).."%", 6, true)
+  return pad_string((math.floor(v*10000)/100).."%", 7, true)
 end
 
 -- create text report from profile data
