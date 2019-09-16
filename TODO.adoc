@@ -1,3 +1,4 @@
 = TODO
 
 * with coroutine behavior observation
+* investigate negative measures
