@@ -1,3 +1,7 @@
 = TODO
 
 * with coroutine behavior observation
+* remove manual record block creation
+* fix report results
+* enforce cleanup
+* section profiler running check
