@@ -226,6 +226,7 @@ function ELProfiler.format(profile_data, mode, threshold)
       if string.len(block.id) > max_len then max_len = string.len(block.id) end
     end
 
+    -- sort by time spent
     table.sort(list, function(a, b)
       return a.time > b.time
     end)
@@ -237,17 +238,19 @@ function ELProfiler.format(profile_data, mode, threshold)
       table.insert(strs, pad_string(block.id, max_len+3).."  "..factor_to_percent(factor).."  "..block.calls.."\n")
 
       local sub_list = {}
-      for sub_block in pairs(block.sub_blocks) do
-        table.insert(sub_list, sub_block)
+      for sub_block, data in pairs(block.sub_blocks) do
+        table.insert(sub_list, {sub_block, data})
       end
 
+      -- sort by sub local time spent
       table.sort(sub_list, function(a, b)
-        return a.time > b.time
+        return a[2].time > b[2].time
       end)
 
-      for _, sub_block in ipairs(sub_list) do
-        local data = block.sub_blocks[sub_block]
-        table.insert(strs, "   "..pad_string(sub_block.id, max_len).."  "..factor_to_percent(sub_block.time/block.time).."  "..sub_block.calls.."\n")
+      for _, sub_block_p in ipairs(sub_list) do
+        local sub_block = sub_block_p[1]
+        local data = sub_block_p[2]
+        table.insert(strs, "   "..pad_string(sub_block.id, max_len).."  "..factor_to_percent(data.time/block.time).."  "..data.calls.."\n")
       end
     end
   elseif mode == "real_list" then
