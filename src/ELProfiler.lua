@@ -90,7 +90,9 @@ local function block_end(id, super_block)
 
         -- get/create sub block
         local sub_block = super_block.sub_blocks[block]
-        sub_block.time = sub_block.time+delta
+        if sub_block then
+          sub_block.time = sub_block.time+delta
+        end
       end
     end
   end
