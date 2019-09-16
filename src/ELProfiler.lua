@@ -177,16 +177,20 @@ end
 -- section begin
 -- id: custom block id
 function ELProfiler.sb(id)
-  local s_id = s_stack[#s_stack]
-  block_begin(id, s_id and blocks[s_id] or blocks.record)
-  table_insert(s_stack, id)
+  if running then
+    local s_id = s_stack[#s_stack]
+    block_begin(id, s_id and blocks[s_id] or blocks.record)
+    table_insert(s_stack, id)
+  end
 end
 
 -- section end
 function ELProfiler.se()
-  local id = table_remove(s_stack)
-  local s_id = s_stack[#s_stack]
-  block_end(id, s_id and blocks[s_id] or blocks.record)
+  if running then
+    local id = table_remove(s_stack)
+    local s_id = s_stack[#s_stack]
+    block_end(id, s_id and blocks[s_id] or blocks.record)
+  end
 end
 
 -- complete string with spaces to reach n
