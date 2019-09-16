@@ -141,6 +141,7 @@ end
 --- blocks: map of block id => block
 ---- block: {}
 ----- id: block id
+----- depth: call depth, 0 is valid
 ----- calls: number of call
 ----- time: time spent
 ----- sub_time: time spent by sub blocks
@@ -208,8 +209,8 @@ end
 
 -- create text report from profile data
 -- mode: (optional) string
---- "spent_tree": blocks by descending time spent with sub blocks (+calls) (default)
---- "real_list": blocks by descending "real" time spent (+calls)
+--- "spent_tree": (default) blocks by descending time spent with sub blocks (+calls), (!) signals a depth ~= 0
+--- "real_list": blocks by descending "real" time spent (+calls), (!) signals a depth ~= 0
 -- threshold: (optional) minimum time factor (0.01 => 1%) required for a block to be displayed (default -1)
 -- return formatted string
 function ELProfiler.format(profile_data, mode, threshold)
@@ -237,7 +238,7 @@ function ELProfiler.format(profile_data, mode, threshold)
       local factor = block.time/blocks.record.time
       if factor < threshold then break end
 
-      table.insert(strs, pad_string(block.id, max_len+3).."  "..factor_to_percent(factor).."  "..block.calls.."\n")
+      table.insert(strs, pad_string(block.id, max_len+3)..(block.depth ~= 0 and "  (!) " or "      ")..factor_to_percent(factor).."  "..block.calls.."\n")
 
       local sub_list = {}
       for sub_block, data in pairs(block.sub_blocks) do
@@ -252,7 +253,7 @@ function ELProfiler.format(profile_data, mode, threshold)
       for _, sub_block_p in ipairs(sub_list) do
         local sub_block = sub_block_p[1]
         local data = sub_block_p[2]
-        table.insert(strs, "   "..pad_string(sub_block.id, max_len).."  "..factor_to_percent(data.time/block.time).."  "..data.calls.."\n")
+        table.insert(strs, "   "..pad_string(sub_block.id, max_len).."      "..factor_to_percent(data.time/block.time).."  "..data.calls.."\n")
       end
     end
   elseif mode == "real_list" then
@@ -273,7 +274,8 @@ function ELProfiler.format(profile_data, mode, threshold)
       local factor = (block.time-block.sub_time)/blocks.record.time
       if factor < threshold then break end
 
-      table.insert(strs, pad_string(block.id, max_len).."  "..factor_to_percent(factor).."  "..block.calls.."\n")
+
+      table.insert(strs, pad_string(block.id, max_len)..(block.depth ~= 0 and "  (!) " or "      ")..factor_to_percent(factor).."  "..block.calls.."\n")
     end
   end
 

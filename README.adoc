@@ -38,7 +38,31 @@ TIP: `os.clock()` is NYI in LuaJIT 2.0.x, you may need to use a more precise and
 
 NOTE: Using sections in `hook` mode is possible, but the section stack doesn't mix with the Lua call stack.
 
-WARNING: A measure of 0 is a hint that the measure is probably wrong.
+WARNING: A measure of 0 or a call depth different from 0 is a hint that the measure is probably wrong.
+
+=== Edge cases
+
+.Sub time
+----
+A
+  B
+    A
+    A
+  B
+A
+
+Currently, the sub time for the same nested block is not correctly computed.
+----
+
+.Wrong stack
+----
+A
+  B
+  A
+B
+
+depth ~= 0 may detect missing/additional begin/end, but it will not detect other incorrect stack patterns (which should only occur when using sections in manual mode).
+----
 
 == API
 
@@ -60,6 +84,7 @@ ELProfiler.start(mode)
 --- blocks: map of block id => block
 ---- block: {}
 ----- id: block id
+----- depth: call depth, 0 is valid
 ----- calls: number of call
 ----- time: time spent
 ----- sub_time: time spent by sub blocks
@@ -78,8 +103,8 @@ ELProfiler.se()
 
 -- create text report from profile data
 -- mode: (optional) string
---- "spent_tree": blocks by descending time spent with sub blocks (+calls) (default)
---- "real_list": blocks by descending "real" time spent (+calls)
+--- "spent_tree": (default) blocks by descending time spent with sub blocks (+calls), (!) signals a depth ~= 0
+--- "real_list": blocks by descending "real" time spent (+calls), (!) signals a depth ~= 0
 -- threshold: (optional) minimum time factor (0.01 => 1%) required for a block to be displayed (default -1)
 -- return formatted string
 ELProfiler.format(profile_data, mode, threshold)
