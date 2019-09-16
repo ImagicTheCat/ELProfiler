@@ -123,16 +123,11 @@ function ELProfiler.start(mode)
   end
 
   mode = mode
+  s_stack = {}
+  blocks = {}
   running = true
-  blocks.record = { -- record block (origin)
-    id = "record",
-    calls = 1,
-    time = 0,
-    sub_time = 0,
-    first_call_time = clock(),
-    sub_blocks = {},
-    depth = 0
-  }
+
+  block_begin("record")
 
   if mode == "hook" then
     debug.sethook(hook, "cr")
@@ -153,11 +148,12 @@ end
 ------- time: time spent in this sub block inside this block
 function ELProfiler.stop()
   if running then
+    block_end("record")
+
     running = false
     if mode == "hook" then
       debug.sethook()
     end
-    blocks.record.time = clock()-blocks.record.first_call_time
 
     local rdata = {blocks = blocks}
     blocks = {}
