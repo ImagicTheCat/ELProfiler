@@ -9,103 +9,52 @@ endif::[]
 :toc: left
 :toclevels: 5
 
-Embeddable Lua Profiler is a pure Lua library designed to profile Lua code.
+Embeddable Lua Profiler is a pure Lua statistical/sampling profiler. It depends on a clock function and the debug hooks.
 
-NOTE: The `debug` library already has limitations; but when using a more sophisticated environment like LuaJIT, the results can be even more difficult to interpret. This library only aims to be a basic Lua code profiler by focusing on reliable data given by the VM instead of finding tricks to measure everything (like C calls).
+TIP: LuaJIT 2.1 has a built-in profiler of much better quality than this library.
 
-TIP: LuaJIT 2.1.x has a built-in profiler more suited than this library; profiling with disabled optimizations is probably not desired and this library can't profile most of LuaJIT optimizations (even with the JIT compiler disabled).
+WARNING: With PUC Lua, unlike LuaJIT, the debug hook is per Lua thread instead of being global. Under those circumstances the profiler will not be able to sample other threads (coroutines).
 
-== Data
+== How it works
 
-The profiler will listen to `call` and `return` hook events of the `debug` library. Collected data is organized into blocks; each block represents something with a beginning and eventually an end. Each beginning is a call and when an end occurs, the approximated time spent in the block is computed.
+The profiler sets the debug hook (for the current Lua thread) and tries to keep the hook event synced with the sampling period by adjusting the instruction period, then samples are taken periodically within an error margin.
 
-.Blocks
-[horizontal]
-function:: each captured function call create a block of id `what:namewhat:name:short_src:linedefined` as described at https://www.lua.org/pil/23.1.html
-record:: the record block is defined by the space between `start()` and `stop()`
-section:: defined by calls to `sb()` and `se()`
+== Profile data
 
-TIP: Blocks may include other blocks, `block.time-block.sub_time` will give insight on the time spent in the block itself, excluding recorded sub blocks.
+Each sample is assigned to a stack dump identifier string formatted as a newline (`\n`) separated list of stack entries, starting with the top of the stack.
 
-.Modes
-[horizontal]
-hook:: use debug hook events
-manual:: no events, manual measures (sections)
+Each stack entry is formatted as `what:short_src:linedefined:name` (debug fields described https://www.lua.org/pil/23.1.html[here]).
 
-NOTE: Manual measures are probably not what you expect from a profiler, but they can be useful to manually investigate performance when other methods don't give useful results. For example, they may get compiled by LuaJIT and may not prevent the JIT compilation of the profiled code.
+The identifier `?` represents missed samples (theoric samples that couldn't be recorded). They can indicate a clock function of poor quality or execution not covered by debug hooks (JIT compiled code, C function, something hanging, etc.).
 
-TIP: `os.clock()` is NYI in LuaJIT 2.0.x, you may need to use a more precise and compilable clock function to that purpose.
+TIP: The stack dump depth can be increased to locate more precisely the hotspots.
 
-NOTE: Using sections in `hook` mode is possible, but the section stack doesn't mix with the Lua call stack.
-
-WARNING: A measure of 0 or a call depth different from 0 is a hint that the measure is probably wrong.
-
-=== Edge cases
-
-.Sub time
-----
-A
-  B
-    A
-    A
-  B
-A
-
-Currently, the sub time for the same nested block is not correctly computed.
-----
-
-.Wrong stack
-----
-A
-  B
-  A
-B
-
-depth ~= 0 may detect missing/additional begin/end, but it will not detect other incorrect stack patterns (which should only occur when using sections in manual mode).
-----
+WARNING: The quality of the profile depends on the quality of the clock function and the number of samples. Enough samples must be recorded to get meaningful measures (at least thousands ?).
 
 == API
 
 [source, lua]
 ----
--- set clock function
--- the default function is os.clock
--- f_clock(): should return the current execution time reference (a number)
+-- Set clock function.
+-- (the default function is os.clock)
+--
+-- f_clock(): should return the current execution time reference in seconds
 ELProfiler.setClock(f_clock)
 
--- start profiling
--- mode: string
---- "hook": debug hook events (default)
---- "manual": no events, manual sections sb/se
-ELProfiler.start(mode)
+-- Start profiling.
+-- period: (optional) sampling period in seconds (default: 0.01 => 10ms/100Hz)
+-- stack_depth: (optional) stack dump depth (default: 1)
+ELProfiler.start(period, stack_depth)
 
--- stop profiling
--- return profile data {}
---- blocks: map of block id => block
----- block: {}
------ id: block id
------ depth: call depth, 0 is valid
------ calls: number of call
------ time: time spent
------ sub_time: time spent by sub blocks
------ sub_blocks: map of block => data
------- data: {}
-------- calls: number of call of this sub block inside this block
-------- time: time spent in this sub block inside this block
+-- Stop profiling.
+-- return profile data {} or nil if not running
+--- duration: profile duration in seconds
+--- samples_count: total number of samples
+--- samples: map of stack dump identifier string => number of samples
 ELProfiler.stop()
 
--- section begin
--- id: custom block id
-ELProfiler.sb(id)
-
--- section end
-ELProfiler.se()
-
--- create text report from profile data
--- mode: (optional) string
---- "spent_tree": (default) blocks by descending time spent with sub blocks (+calls), (!) signals a depth ~= 0
---- "real_list": blocks by descending "real" time spent (+calls), (!) signals a depth ~= 0
--- threshold: (optional) minimum time factor (0.01 => 1%) required for a block to be displayed (default -1)
+-- Create text report from profile data.
+-- threshold: (optional) minimum samples fraction required (0.01 => 1%, default: 0)
 -- return formatted string
-ELProfiler.format(profile_data, mode, threshold)
+ELProfiler.format(profile_data, threshold)
 ----
