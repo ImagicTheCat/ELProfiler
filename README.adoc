@@ -13,11 +13,11 @@ Embeddable Lua Profiler is a pure Lua statistical/sampling profiler. It depends 
 
 TIP: LuaJIT 2.1 has a built-in profiler of much better quality than this library.
 
-WARNING: With PUC Lua, unlike LuaJIT, the debug hook is per Lua thread instead of being global. Under those circumstances the profiler will not be able to sample other threads (coroutines).
+WARNING: With PUC Lua, unlike LuaJIT, the debug hook is per Lua thread instead of being global. Under those circumstances the profiler will not be able to sample other threads (coroutines) by default; `watch()` can be called on each created coroutine for complete coverage, but the result may not be as good when there is a lot of thread switching.
 
 == How it works
 
-The profiler sets the debug hook (for the current Lua thread) and tries to keep the hook event synced with the sampling period by adjusting the instruction period, then samples are taken periodically within an error margin.
+The profiler sets the debug hook (for the current and watched Lua threads) and tries to keep the hook event synced with the sampling period by adjusting the instruction period, then samples are taken periodically within an error margin.
 
 == Profile data
 
@@ -41,7 +41,16 @@ WARNING: The quality of the profile depends on the quality of the clock function
 -- f_clock(): should return the current execution time reference in seconds
 ELProfiler.setClock(f_clock)
 
+-- Watch a Lua thread/coroutine for profiling.
+-- LuaJIT has a global debug hook, thus this function should only be used with PUC Lua.
+-- Once the thread is referenced, it will be recorded by all subsequent uses of the library.
+ELProfiler.watch(thread)
+
 -- Start profiling.
+-- With PUC Lua, start()/stop() functions must be called in the same thread,
+-- main or another one (in this case the main thread will not be recorded,
+-- unless watched).
+--
 -- period: (optional) sampling period in seconds (default: 0.01 => 10ms/100Hz)
 -- stack_depth: (optional) stack dump depth (default: 1)
 ELProfiler.start(period, stack_depth)

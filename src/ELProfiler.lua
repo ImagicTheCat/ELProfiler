@@ -31,9 +31,11 @@ local math_max, math_floor = math.max, math.floor
 
 local ELProfiler = {}
 local running = false
-local p_stack_depth, p_period, last_step_time, last_sample_time, ins_step, start_time
+local p_stack_depth, p_period, last_sample_time, start_time
 local clock = os.clock
 local samples = {}
+local threads = setmetatable({}, {__mode = "k"}) -- watched threads, map of Lua thread => state
+local main = {} -- main thread (source of start()/stop()) state
 
 -- Stack dump used as sample identifier.
 -- start: start level
@@ -45,7 +47,7 @@ local function dump_stack(start, depth)
   local info = debug_getinfo(start, "nS")
   while info and i < depth do
     -- dump stack entry
-    table_insert(dump, table_concat({info.what, info.short_src, info.linedefined, info.name or ""}, ":"))
+    table_insert(dump, table_concat({info.what, info.short_src, info.linedefined, info.name or "?"}, ":"))
     -- next
     i = i+1
     info = debug_getinfo(start+i, "nS")
@@ -53,33 +55,58 @@ local function dump_stack(start, depth)
   return table_concat(dump, "\n")
 end
 
--- Debug hook.
-local function hook()
+-- Generic debug hook.
+local function g_hook(state)
+  -- Syncing (per Lua state).
   -- compute step delta time
   local time = clock()
-  local dt = time-last_step_time
-  last_step_time = time
+  local dt = time-state.last_step_time
+  state.last_step_time = time
   -- compute instruction step to approximate the sampling period
   if dt > 0 then -- the delta time is used to compute the approximation
-    ins_step = math_max(math_floor(ins_step/dt*p_period), 1)
+    state.ins_step = math_max(math_floor(state.ins_step/dt*p_period), 1)
   else -- the instruction step is exponentially increased to prevent hook overhead
-    ins_step = ins_step*2
+    state.ins_step = state.ins_step*2
   end
-  debug_sethook(hook, "", ins_step)
-  -- Sampling.
+  debug_sethook(state.hook, "", state.ins_step)
+  -- Sampling (global).
   -- Allow sampling error by 30%: prevent oversampling when late and prevent
   -- undersampling when early.
   local sampling_dt = time-last_sample_time
   if sampling_dt >= p_period*0.3 then
     if sampling_dt <= p_period*1.3 then
-      local id = dump_stack(3, p_stack_depth)
+      local id = dump_stack(4, p_stack_depth)
       samples[id] = (samples[id] or 0)+1
     end
     last_sample_time = time
   end
 end
 
+main.hook = function() g_hook(main) end
+
+local function init_thread_state(state, time)
+  state.ins_step = 1
+  state.last_step_time = time
+end
+
+-- Watch a Lua thread/coroutine for profiling.
+-- LuaJIT has a global debug hook, thus this function should only be used with PUC Lua.
+-- Once the thread is referenced, it will be recorded by all subsequent uses of the library.
+function ELProfiler.watch(thread)
+  local state = {}
+  state.hook = function() g_hook(state) end
+  threads[thread] = state
+  if running then
+    init_thread_state(state, start_time)
+    debug_sethook(thread, state.hook, "", state.ins_step)
+  end
+end
+
 -- Start profiling.
+-- With PUC Lua, start()/stop() functions must be called in the same thread,
+-- main or another one (in this case the main thread will not be recorded,
+-- unless watched).
+--
 -- period: (optional) sampling period in seconds (default: 0.01 => 10ms/100Hz)
 -- stack_depth: (optional) stack dump depth (default: 1)
 function ELProfiler.start(period, stack_depth)
@@ -88,9 +115,14 @@ function ELProfiler.start(period, stack_depth)
   p_period = period or 0.01
   p_stack_depth = stack_depth or 1
   start_time = clock()
-  last_step_time, last_sample_time = start_time, start_time
-  ins_step = 1
-  debug.sethook(hook, "", ins_step)
+  last_sample_time = start_time
+  -- init thread states
+  init_thread_state(main, start_time)
+  debug.sethook(main.hook, "", main.ins_step)
+  for thread, state in pairs(threads) do
+    init_thread_state(state, start_time)
+    debug_sethook(thread, state.hook, "", state.ins_step)
+  end
 end
 
 -- Stop profiling.
@@ -101,7 +133,9 @@ end
 function ELProfiler.stop()
   if running then
     running = false
-    debug.sethook()
+    -- remove hooks
+    debug.sethook() -- main
+    for thread in pairs(threads) do debug_sethook(thread) end
     -- build data
     local duration = clock()-start_time
     local total_samples = 0
