@@ -25,7 +25,7 @@ The profiler sets the debug hook (for the current and watched Lua threads) and t
 
 Each sample is assigned to a stack dump identifier string formatted as a newline (`\n`) separated list of stack entries, starting with the top of the stack.
 
-Each stack entry is formatted as `what:short_src:linedefined:name` (debug fields described https://www.lua.org/pil/23.1.html[here]).
+Each stack entry is formatted as `what:short_src:name:currentline` (see https://www.lua.org/manual/5.1/manual.html#lua_Debug[debug fields]).
 
 The identifier `?` represents missed samples (theoric samples that couldn't be recorded). They can indicate a clock function of poor quality or execution not covered by debug hooks (JIT compiled code, C function, something hanging, etc.).
 

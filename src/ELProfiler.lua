@@ -44,13 +44,13 @@ local main = {} -- main thread (source of start()/stop()) state
 local function dump_stack(start, depth)
   local dump = {}
   local i = 0
-  local info = debug_getinfo(start, "nS")
+  local info = debug_getinfo(start, "nSl")
   while info and i < depth do
     -- dump stack entry
-    table_insert(dump, table_concat({info.what, info.short_src, info.linedefined, info.name or "?"}, ":"))
+    table_insert(dump, table_concat({info.what, info.short_src, info.name or "?", info.currentline}, ":"))
     -- next
     i = i+1
-    info = debug_getinfo(start+i, "nS")
+    info = debug_getinfo(start+i, "nSl")
   end
   return table_concat(dump, "\n")
 end
